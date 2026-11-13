@@ -1,4 +1,3 @@
-
 name: Python CI
 
 on:
@@ -14,21 +13,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout PR code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - name: Install tools
         run: |
           python -m pip install --upgrade pip
           pip install ruff pytest
 
+      - name: Record commit SHA
+        run: |
+          echo "${{ github.event.pull_request.head.sha || github.sha }}" > head-sha.txt
+
       - name: Run Ruff
-        run: ruff check . --output-format json > ruff-results.json
+        run: |
+          ruff check . --output-format json > ruff-results.json
+          echo "Ruff completed"
 
       - name: Run pytest
-        run: pytest -q
+        if: always()
+        run: |
+          pytest -q --junitxml=pytest-results.xml
+
+      - name: Upload CI results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-ci-results
+          path: |
+            head-sha.txt
+            ruff-results.json
+            pytest-results.xml
+          if-no-files-found: warn
+          retention-days: 7
